@@ -1,0 +1,483 @@
+//+------------------------------------------------------------------+
+//|                                             QuantMomentsGale.mq5 |
+//|                        Copyright 2019, MetaQuotes Software Corp. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+
+#include <Math\Stat\Normal.mqh>
+#include <Trade\Trade.mqh>
+#include <Trade\PositionInfo.mqh>
+#include <Trade\SymbolInfo.mqh>
+
+CPositionInfo position;
+CTrade trades;
+
+int ticket_b=-1;
+int ticket_s=-1;
+int Sells;
+int Buys;
+datetime time;
+bool buy=true,sell=false;
+
+input int MagicNumber=1;
+input int StopLoss=200;
+input double Percent=2;
+
+double point=SymbolInfoDouble(Symbol(),SYMBOL_POINT);
+double current_lot=0.1;
+
+input int NumClose=100;
+input int PerRSI=14;
+input int PerBoll=20;
+input double DesvBoll=2;
+
+input double MultAtipicoMin=1.5;
+input double MultAtipicoMax=1.5;
+
+input double BandaSuperiorRSI=70;
+input double BandaInferiorRSI=30;
+
+ulong Ticket;
+double profit_trade,volumen;
+
+int TripleEmaCopia,CopiaStocRsi,BollingerCopia,RSICopia;
+double Precios[],TripleEma[],RSIStocFast[],RSIStocSlow[],RSI[],BandaSupBoll[],MediaBoll[],BandaInfBoll[];
+double MinValue,MinQuartil,Median,MaxQuartil,MaxValue;
+double ValAtipicoMin,ValAtipicoMax,ValExtremoMin,ValExtremoMax,Diferencia;
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+}
+int OnInit()
+  {
+
+   RSICopia=iRSI(NULL,0,PerRSI,PRICE_CLOSE);
+   BollingerCopia=iBands(NULL,0,PerBoll,0,DesvBoll,PRICE_CLOSE);
+
+   return(INIT_SUCCEEDED);
+  }
+//+-------------------------------------------------
+
+//---------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+
+   ArraySetAsSeries(RSI,true);
+   CopyBuffer(RSICopia,0,0,10,RSI);
+
+   ArraySetAsSeries(BandaSupBoll,true);
+   ArraySetAsSeries(MediaBoll,true);
+   ArraySetAsSeries(BandaInfBoll,true);
+
+   CopyBuffer(BollingerCopia,0,0,10,MediaBoll);
+   CopyBuffer(BollingerCopia,1,0,10,BandaSupBoll);
+   CopyBuffer(BollingerCopia,2,0,10,BandaInfBoll);
+
+   ArrayResize(Precios,NumClose);
+
+   for(int i=0; i<(NumClose); i++)
+     {
+      Precios[i]=iClose(NULL,0,i+1);
+     }
+
+   MathTukeySummary(Precios,false,MinValue,MinQuartil,Median,MaxQuartil,MaxValue);
+
+/*  Comment("\n",
+           "\n",MinValue,
+           "\n",MinQuartil,
+           "\n",Median,
+           "\n",MaxQuartil,
+           "\n",MaxValue,
+           "\n",ValAtipicoMax,
+           "\n",ValExtremoMax); */
+
+   ValAtipicoMin=MinQuartil-(MultAtipicoMin*(MaxQuartil-MinQuartil));
+   ValAtipicoMax=MinQuartil+(MultAtipicoMax*(MaxQuartil-MinQuartil));
+
+/* Comment("\n",
+           "\n",MediaBoll[1],
+           "\n",Diferencia,
+           "\n",ValAtipicoMax); */
+//+------------------------------------------------------------------+
+//|       Martingale                                                 |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//|   Estrategias tipo 1:1                                           |
+//+------------------------------------------------------------------+
+
+// Max perdida aprox 1200 usd
+
+// current_lot=0.01;
+
+   if(Percent==1)
+     {
+      HistorySelect(0,TimeCurrent());
+      int count=0;
+      for(int i=HistoryDealsTotal()-1; i>=0; i--)
+        {
+         Ticket=HistoryDealGetTicket(i);
+         profit_trade=HistoryDealGetDouble(Ticket,DEAL_PROFIT);
+         if(HistoryDealGetInteger(Ticket,DEAL_MAGIC)==MagicNumber)
+           {
+            if(profit_trade<0)
+              {
+               //lots_trade=HistoryDealGetDouble(Ticket,DEAL_VOLUME);
+               //last_day_order = HistoryDealGetInteger(Ticket,DEAL_TIME);
+               count=count+1;
+              }
+            if(profit_trade>0)
+              {
+               break;
+              }
+           }
+        }
+      if(count==0)
+        {
+         current_lot=0.01;
+           }else if(count==1){
+         current_lot=0.01;
+           }else if(count==2){
+         current_lot=0.05;
+           }else if(count==3){
+         current_lot=0.10;
+           }else if(count==4){
+         current_lot=0.20;
+           }else if(count==5){
+         current_lot=0.40;
+           }else if(count==6){
+         current_lot=0.80;
+           }else if(count==7){
+         current_lot=1.60;
+           }else if(count>=8){
+         current_lot=3.20;
+        }
+     }
+
+//+------------------------------------------------------------------+
+//|Estrategias del tipo 2:1                                          |
+//+------------------------------------------------------------------+
+
+// Max perdida aprox 1500 usd
+
+   if(Percent==2)
+     {
+      HistorySelect(0,TimeCurrent());
+      int count=0;
+      for(int i=HistoryDealsTotal()-1; i>=0; i--)
+        {
+         Ticket=HistoryDealGetTicket(i);
+         profit_trade=HistoryDealGetDouble(Ticket,DEAL_PROFIT);
+         if(HistoryDealGetInteger(Ticket,DEAL_MAGIC)==MagicNumber)
+           {
+            if(profit_trade<0)
+              {
+               //lots_trade=HistoryDealGetDouble(Ticket,DEAL_VOLUME);
+               //last_day_order = HistoryDealGetInteger(Ticket,DEAL_TIME);
+               count=count+1;
+              }
+            if(profit_trade>0)
+              {
+               break;
+              }
+           }
+        }
+      if(count==0)
+        {
+         current_lot=0.01;
+           }else if(count==1){
+         current_lot=0.01;
+           }else if(count==2){
+         current_lot=0.01;
+           }else if(count==3){
+         current_lot=0.02;
+           }else if(count==4){
+         current_lot=0.03;
+           }else if(count==5){
+         current_lot=0.04;
+           }else if(count==6){
+         current_lot=0.07;
+           }else if(count==7){
+         current_lot=0.10;
+           }else if(count==8){
+         current_lot=0.15;
+           }else if(count==9){
+         current_lot=0.23;
+           }else if(count==10){
+         current_lot=0.34;
+           }else if(count==11){
+         current_lot=0.51;
+           }else if(count==12){
+         current_lot=0.76;
+           }else if(count==13){
+         current_lot=1.15;
+           }else if(count==14){
+         current_lot=1.72;
+           }else if(count==15){
+         current_lot=2.58;
+           }else if(count==16){
+         current_lot=3.87;
+           }else if(count==17){
+         current_lot=5.80;
+           }else if(count==18){
+         current_lot=8.71;
+           }else if(count==19){
+         current_lot=13.06;
+           }else if(count>=20){
+         current_lot=19.58;
+        }
+     }
+//+------------------------------------------------------------------+
+//| Estrategias del tipo 3:1                                         |
+//+------------------------------------------------------------------+
+
+   if(Percent==3)
+     {
+      HistorySelect(0,TimeCurrent());
+      int count=0;
+      for(int i=HistoryDealsTotal()-1; i>=0; i--)
+        {
+         Ticket=HistoryDealGetTicket(i);
+         profit_trade=HistoryDealGetDouble(Ticket,DEAL_PROFIT);
+         if(HistoryDealGetInteger(Ticket,DEAL_MAGIC)==MagicNumber)
+           {
+            if(profit_trade<0)
+              {
+               //lots_trade=HistoryDealGetDouble(Ticket,DEAL_VOLUME);
+               //last_day_order = HistoryDealGetInteger(Ticket,DEAL_TIME);
+               count=count+1;
+              }
+            if(profit_trade>0)
+              {
+               break;
+              }
+           }
+        }
+      if(count==0)
+        {
+         current_lot=0.01;
+           }else if(count==1){
+         current_lot=0.01;
+           }else if(count==2){
+         current_lot=0.01;
+           }else if(count==3){
+         current_lot=0.01;
+           }else if(count==4){
+         current_lot=0.02;
+           }else if(count==5){
+         current_lot=0.02;
+           }else if(count==6){
+         current_lot=0.03;
+           }else if(count==7){
+         current_lot=0.04;
+           }else if(count==8){
+         current_lot=0.05;
+           }else if(count==9){
+         current_lot=0.07;
+           }else if(count==10){
+         current_lot=0.09;
+           }else if(count==11){
+         current_lot=0.13;
+           }else if(count==12){
+         current_lot=0.17;
+           }else if(count==13){
+         current_lot=0.22;
+           }else if(count==14){
+         current_lot=0.30;
+           }else if(count==15){
+         current_lot=0.40;
+           }else if(count==16){
+         current_lot=0.53;
+           }else if(count==17){
+         current_lot=0.71;
+           }else if(count==18){
+         current_lot=0.94;
+           }else if(count==19){
+         current_lot=1.26;
+           }else if(count==20){
+         current_lot=1.68;
+           }else if(count==21){
+         current_lot=2.24;
+           }else if(count==22){
+         current_lot=2.98;
+           }else if(count==23){
+         current_lot=3.98;
+           }else if(count==24){
+         current_lot=5.30;
+           }else if(count>=25){
+         current_lot=7.07;
+        }
+     }
+//+------------------------------------------------------------------+
+//|          5:1                                                        |
+//+------------------------------------------------------------------+
+   if(Percent==5)
+     {
+      HistorySelect(0,TimeCurrent());
+      int count=0;
+      for(int i=HistoryDealsTotal()-1; i>=0; i--)
+        {
+         Ticket=HistoryDealGetTicket(i);
+         profit_trade=HistoryDealGetDouble(Ticket,DEAL_PROFIT);
+         if(HistoryDealGetInteger(Ticket,DEAL_MAGIC)==MagicNumber)
+           {
+            if(profit_trade<0)
+              {
+               //lots_trade=HistoryDealGetDouble(Ticket,DEAL_VOLUME);
+               //last_day_order = HistoryDealGetInteger(Ticket,DEAL_TIME);
+               count=count+1;
+              }
+            if(profit_trade>0)
+              {
+               break;
+              }
+           }
+        }
+      if(count==0)
+        {
+         current_lot=0.01;
+           }else if(count==1){
+         current_lot=0.01;
+           }else if(count==2){
+         current_lot=0.01;
+           }else if(count==3){
+         current_lot=0.01;
+           }else if(count==4){
+         current_lot=0.01;
+           }else if(count==5){
+         current_lot=0.01;
+           }else if(count==6){
+         current_lot=0.02;
+           }else if(count==7){
+         current_lot=0.02;
+           }else if(count==8){
+         current_lot=0.03;
+           }else if(count==9){
+         current_lot=0.03;
+           }else if(count==10){
+         current_lot=0.04;
+           }else if(count==11){
+         current_lot=0.05;
+           }else if(count==12){
+         current_lot=0.06;
+           }else if(count==13){
+         current_lot=0.07;
+           }else if(count==14){
+         current_lot=0.08;
+           }else if(count==15){
+         current_lot=0.10;
+           }else if(count==16){
+         current_lot=0.12;
+           }else if(count==17){
+         current_lot=0.14;
+           }else if(count==18){
+         current_lot=0.17;
+           }else if(count==19){
+         current_lot=0.20;
+           }else if(count==20){
+         current_lot=0.24;
+           }else if(count==21){
+         current_lot=0.29;
+           }else if(count==22){
+         current_lot=0.35;
+           }else if(count==23){
+         current_lot=0.42;
+           }else if(count==24){
+         current_lot=0.50;
+           }else if(count==25){
+         current_lot=0.60;
+           }else if(count==26){
+         current_lot=0.72;
+           }else if(count==27){
+         current_lot=0.87;
+           }else if(count==28){
+         current_lot=1.04;
+           }else if(count==29){
+         current_lot=1.25;
+           }else if(count==30){
+         current_lot=1.50;
+           }else if(count==31){
+         current_lot=1.80;
+           }else if(count>=32){
+         current_lot=2.16;
+        }
+     }
+
+  /* MqlRates PriceInformation[];
+   ArraySetAsSeries(PriceInformation,true);
+
+   int Data=CopyRates(Symbol(),Period(),0,Bars(Symbol(),Period()),PriceInformation);
+
+   int NumberOfCandles=Bars(Symbol(),Period());
+   string NumberOfCaldelsText=IntegerToString(NumberOfCandles); */
+
+   Count();
+   if(Buys==0 && Sells==0 && time!=iTime(Symbol(),0,0))
+     {
+      if(Precios[0]<ValAtipicoMin && Precios[0]<BandaInfBoll[1] && Precios[0]<BandaInferiorRSI)
+        {
+         OpenBuy();
+         time=iTime(Symbol(),0,0);
+         //ObjectCreate(_Symbol,NumberOfCaldelsText,OBJ_ARROW_BUY,0,TimeCurrent(),(PriceInformation[1].low));
+        }
+      if(Precios[0]>ValAtipicoMax && Precios[0]>BandaSupBoll[1] && Precios[0]>BandaSuperiorRSI)
+        {
+         OpenSell();
+         time=iTime(Symbol(),0,0);
+         //ObjectCreate(_Symbol,NumberOfCaldelsText,OBJ_ARROW_SELL,0,TimeCurrent(),(PriceInformation[1].high));
+        }
+     }
+
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+int OpenBuy()
+  {
+   trades.SetExpertMagicNumber(MagicNumber);
+   ticket_b=trades.Buy(current_lot,NULL,SymbolInfoDouble(NULL,SYMBOL_ASK),SymbolInfoDouble(NULL,SYMBOL_ASK)-(StopLoss*point),SymbolInfoDouble(NULL,SYMBOL_ASK)+((StopLoss*Percent)*point),NULL);
+   return(0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+int OpenSell()
+  {
+   trades.SetExpertMagicNumber(MagicNumber);
+   ticket_s=trades.Sell(current_lot,NULL,SymbolInfoDouble(NULL,SYMBOL_BID),SymbolInfoDouble(NULL,SYMBOL_BID)+(StopLoss*point),SymbolInfoDouble(NULL,SYMBOL_BID)-((StopLoss*Percent)*point),NULL);
+   return(0);
+  }
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+void Count()
+  {
+   Buys=0;Sells=0;
+   for(int i=PositionsTotal()-1;i>=0;i--)
+      //+------------------------------------------------------------------+
+      //|                                                                  |
+      //+------------------------------------------------------------------+
+     {
+      long magic=position.Magic();
+      PositionGetTicket(i);
+      if(magic==MagicNumber)
+        {
+         if(position.PositionType()==POSITION_TYPE_BUY)
+           {
+            Buys++;
+              }else{
+            if(position.PositionType()==POSITION_TYPE_SELL)
+              {
+               Sells++;
+              }
+           }
+        }
+     }
+  }
+
